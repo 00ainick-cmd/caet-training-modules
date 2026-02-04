@@ -462,8 +462,8 @@ function resize() {
   dpr = window.devicePixelRatio || 1;
   const wrap = $('canvasWrap');
   W = wrap.clientWidth;
-  // Aspect ratio: wider on desktop, taller on mobile
-  H = Math.max(280, Math.min(W * 0.55, 420));
+  // Taller canvas to fit labels above/below rails
+  H = Math.max(320, Math.min(W * 0.6, 460));
   wrap.style.height = H + 'px';
   canvas.style.width = W + 'px';
   canvas.style.height = H + 'px';
@@ -769,7 +769,8 @@ function drawResH(x, y, label, ohms, vDrop, current, isFault, isOpen) {
 }
 
 // ── Draw vertical resistor (parallel) ──
-function drawResV(x, yTop, yBot, label, ohms, vDrop, current, isFault, isOpen) {
+// Labels go ABOVE top rail and BELOW bottom rail to avoid overlap
+function drawResV(x, yTop, yBot, railTop, railBot, label, ohms, vDrop, current, isFault, isOpen) {
   let segs = 6, amp = 10;
   let pts = vZigPts(x, yTop, yBot, segs, amp);
   ctx.beginPath();
@@ -783,23 +784,21 @@ function drawResV(x, yTop, yBot, label, ohms, vDrop, current, isFault, isOpen) {
     ctx.beginPath(); ctx.moveTo(x-7,my-7); ctx.lineTo(x+7,my+7); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x+7,my-7); ctx.lineTo(x-7,my+7); ctx.stroke();
   }
-  // Label left of resistor
-  let my = (yTop+yBot)/2;
-  ctx.textAlign = 'right';
+  // Label + Ohms ABOVE top rail (centered on each resistor's column)
+  ctx.textAlign = 'center';
   ctx.font = 'bold 12px Orbitron, monospace';
   ctx.fillStyle = isFault ? '#ffaa00' : '#00ff88';
-  ctx.fillText(label, x - 18, my - 6);
+  ctx.fillText(label, x, railTop - 20);
   ctx.font = '10px "Share Tech Mono", monospace';
   ctx.fillStyle = '#3d5a6e';
-  ctx.fillText(fR(ohms), x - 18, my + 6);
-  // Readings right of resistor
-  ctx.textAlign = 'left';
+  ctx.fillText(fR(ohms), x, railTop - 8);
+  // Voltage + Current BELOW bottom rail
   ctx.font = 'bold 11px Orbitron, monospace';
   ctx.fillStyle = isFault ? '#ffaa00' : '#00cc6a';
-  ctx.fillText(vDrop.toFixed(1)+'V', x + 16, my - 6);
+  ctx.fillText(vDrop.toFixed(1)+'V', x, railBot + 16);
   ctx.font = '10px "Share Tech Mono", monospace';
   ctx.fillStyle = '#3d5a6e';
-  ctx.fillText(fI(current), x + 16, my + 6);
+  ctx.fillText(fI(current), x, railBot + 28);
 }
 
 // ── Junction dot ──
@@ -935,19 +934,20 @@ function drawParallel(c, flow) {
   let pad = Math.max(40, W * 0.05);
   let my = H / 2;
   let bx = pad + 15;
-  let topY = my - H * 0.32;
-  let botY = my + H * 0.32;
+  // More vertical room: labels go above/below rails
+  let topY = my - H * 0.24;
+  let botY = my + H * 0.24;
   let rightX = W - pad;
 
-  // Three resistor X positions, evenly spaced between battery and right edge
-  let rZone = rightX - bx - 60;
-  let r1x = bx + 60 + rZone * 0.25;
-  let r2x = bx + 60 + rZone * 0.50;
-  let r3x = bx + 60 + rZone * 0.75;
+  // Three resistor X positions — wider spacing
+  let rZone = rightX - bx - 50;
+  let r1x = bx + 50 + rZone * 0.22;
+  let r2x = bx + 50 + rZone * 0.50;
+  let r3x = bx + 50 + rZone * 0.78;
 
-  // Resistor vertical span
-  let rTop = topY + 30;
-  let rBot = botY - 30;
+  // Resistor vertical span (between the rails)
+  let rTop = topY + 16;
+  let rBot = botY - 16;
 
   let wc = flow ? 'rgba(0,255,136,0.3)' : 'rgba(42,74,58,0.4)';
 
@@ -974,10 +974,10 @@ function drawParallel(c, flow) {
   dot(r1x, topY); dot(r2x, topY); dot(r3x, topY);
   dot(r1x, botY); dot(r2x, botY); dot(r3x, botY);
 
-  // ── VERTICAL RESISTORS ──
-  drawResV(r1x, rTop, rBot, 'R1', c.comp[0].R, c.comp[0].V, c.comp[0].I, false, false);
-  drawResV(r2x, rTop, rBot, 'R2', c.comp[1].R, c.comp[1].V, c.comp[1].I, c.comp[1].f, fault==='open');
-  drawResV(r3x, rTop, rBot, 'R3', c.comp[2].R, c.comp[2].V, c.comp[2].I, false, false);
+  // ── VERTICAL RESISTORS (pass rail positions for label placement) ──
+  drawResV(r1x, rTop, rBot, topY, botY, 'R1', c.comp[0].R, c.comp[0].V, c.comp[0].I, false, false);
+  drawResV(r2x, rTop, rBot, topY, botY, 'R2', c.comp[1].R, c.comp[1].V, c.comp[1].I, c.comp[1].f, fault==='open');
+  drawResV(r3x, rTop, rBot, topY, botY, 'R3', c.comp[2].R, c.comp[2].V, c.comp[2].I, false, false);
 
   // ── CURRENT ARROWS ──
   if (flow) {
@@ -985,7 +985,7 @@ function drawParallel(c, flow) {
     for (let i = 0; i < 3; i++) {
       if (i===1 && fault==='open') continue;
       let rx = [r1x, r2x, r3x][i];
-      arrow(rx, topY + 16, 'd');
+      arrow(rx, topY + 10, 'd');
     }
   }
 
