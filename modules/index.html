@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Series &amp; Parallel Circuit Simulator — CAET Base</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --green: #00ff88;
+    --green-dim: #00cc6a;
+    --green-dark: #004d28;
+    --amber: #ffaa00;
+    --red: #ff3344;
+    --cyan: #00eeff;
+    --bg: #0a0e14;
+    --panel: #0d1117;
+    --border: #1a2332;
+    --dim: #3d5a6e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Scanlines */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 1px, transparent 1px, transparent 3px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: linear-gradient(180deg, #0f1923, var(--bg));
+    border-bottom: 1px solid var(--green-dark);
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(0.75rem, 3vw, 1.1rem);
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px var(--green-dark);
+  }
+  .badge {
+    font-size: 0.6rem;
+    color: var(--dim);
+    border: 1px solid var(--border);
+    padding: 0.2rem 0.5rem;
+    letter-spacing: 2px;
+  }
+
+  /* ── MODE TOGGLE ── */
+  .mode-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+  .mode-btn {
+    flex: 1;
+    padding: 0.75rem;
+    background: transparent;
+    border: none;
+    color: var(--dim);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .mode-btn.active {
+    background: var(--green-dark);
+    color: var(--green);
+    text-shadow: 0 0 12px var(--green-dark);
+  }
+
+  /* ── SCHEMATIC CANVAS ── */
+  .canvas-wrap {
+    position: relative;
+    width: 100%;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── READOUTS ── */
+  .readouts {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+  .readout {
+    padding: 0.6rem 0.4rem;
+    text-align: center;
+    border-right: 1px solid var(--border);
+  }
+  .readout:last-child { border-right: none; }
+  .readout-label {
+    font-size: clamp(0.45rem, 1.5vw, 0.6rem);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 0.15rem;
+  }
+  .readout-val {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1rem, 4vw, 1.6rem);
+    font-weight: 900;
+    color: var(--green);
+    text-shadow: 0 0 12px var(--green-dark);
+    line-height: 1.2;
+  }
+  .readout-unit {
+    font-size: clamp(0.5rem, 1.5vw, 0.7rem);
+    color: var(--green-dim);
+  }
+  .readout.warn .readout-val { color: var(--amber); text-shadow: 0 0 12px rgba(255,170,0,0.3); }
+  .readout.fault .readout-val { color: var(--red); animation: blink 0.8s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  /* ── CONTROLS PANEL ── */
+  .controls {
+    padding: 1.25rem;
+    background: var(--panel);
+  }
+  .section-label {
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .section-label::before {
+    content: '';
+    width: 5px; height: 5px;
+    background: var(--amber);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--amber);
+  }
+
+  .slider-row {
+    margin-bottom: 1rem;
+  }
+  .slider-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.4rem;
+  }
+  .slider-name {
+    font-size: 0.85rem;
+    color: var(--green-dim);
+  }
+  .slider-val {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(0.9rem, 3vw, 1.1rem);
+    font-weight: 700;
+    color: var(--green);
+    text-shadow: 0 0 8px var(--green-dark);
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 28px; height: 28px;
+    background: var(--green);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 12px var(--green-dark);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 28px; height: 28px;
+    background: var(--green);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 12px var(--green-dark);
+  }
+
+  /* Fault buttons */
+  .fault-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .fault-btn {
+    padding: 0.65rem 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    text-align: center;
+    touch-action: manipulation;
+  }
+  .fault-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .fault-btn.active { border-color: var(--red); color: var(--red); background: rgba(255,51,68,0.08); }
+  .fault-btn.active-ok { border-color: var(--green); color: var(--green); background: rgba(0,255,136,0.06); }
+
+  /* Speed */
+  .speed-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .speed-btn {
+    flex: 1;
+    padding: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    touch-action: manipulation;
+  }
+  .speed-btn.active { border-color: var(--green); color: var(--green); }
+
+  /* ── OHM'S LAW PANEL ── */
+  .ohm-panel {
+    padding: 1.25rem;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+
+  .calc-step {
+    margin-bottom: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    background: rgba(0,255,136,0.03);
+    border-left: 2px solid var(--green-dark);
+    border-radius: 0 4px 4px 0;
+  }
+  .calc-step.hl {
+    border-left-color: var(--cyan);
+    background: rgba(0,238,255,0.04);
+  }
+  .calc-step-label {
+    font-size: 0.55rem;
+    color: var(--dim);
+    letter-spacing: 1px;
+    margin-bottom: 0.15rem;
+  }
+  .calc-formula {
+    font-size: 0.8rem;
+    color: var(--green-dim);
+  }
+  .calc-result {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(0.8rem, 2.5vw, 0.95rem);
+    font-weight: 700;
+    color: var(--green);
+    text-shadow: 0 0 6px var(--green-dark);
+    margin-top: 0.15rem;
+  }
+  .calc-step.hl .calc-result { color: var(--cyan); text-shadow: 0 0 8px rgba(0,238,255,0.3); }
+
+  /* Component readings */
+  .comp-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0.6rem;
+    margin-bottom: 0.3rem;
+    background: rgba(0,255,136,0.03);
+    border-radius: 3px;
+    font-size: 0.8rem;
+  }
+  .comp-name { color: var(--green-dim); }
+  .comp-vals {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--green);
+  }
+  .comp-row.fault-item .comp-name { color: var(--amber); }
+
+  /* Fault diagnosis */
+  .fault-box {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border: 1px solid var(--red);
+    border-radius: 4px;
+    background: rgba(255,51,68,0.04);
+    display: none;
+  }
+  .fault-box.show { display: block; }
+  .fault-box h4 { color: var(--red); font-size: 0.65rem; letter-spacing: 2px; margin-bottom: 0.4rem; }
+  .fault-box p { font-size: 0.75rem; color: var(--amber); line-height: 1.5; }
+  .fault-box .symptom {
+    font-size: 0.7rem;
+    color: var(--dim);
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255,51,68,0.2);
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <h1>Circuit Simulator</h1>
+  <span class="badge">CAET BASE · MOD 2</span>
+</header>
+
+<div class="mode-bar">
+  <button class="mode-btn active" id="btnSeries" onclick="setMode('series')">Series</button>
+  <button class="mode-btn" id="btnParallel" onclick="setMode('parallel')">Parallel</button>
+</div>
+
+<!-- SCHEMATIC -->
+<div class="canvas-wrap" id="canvasWrap">
+  <canvas id="C"></canvas>
+</div>
+
+<!-- READOUTS -->
+<div class="readouts">
+  <div class="readout" id="roV">
+    <div class="readout-label">Source</div>
+    <div class="readout-val" id="rvV">28.0</div>
+    <div class="readout-unit">V</div>
+  </div>
+  <div class="readout" id="roR">
+    <div class="readout-label">R Total</div>
+    <div class="readout-val" id="rvR">450</div>
+    <div class="readout-unit">Ω</div>
+  </div>
+  <div class="readout" id="roI">
+    <div class="readout-label">Current</div>
+    <div class="readout-val" id="rvI">62.2</div>
+    <div class="readout-unit" id="rvIu">mA</div>
+  </div>
+  <div class="readout" id="roP">
+    <div class="readout-label">Power</div>
+    <div class="readout-val" id="rvP">1.74</div>
+    <div class="readout-unit">W</div>
+  </div>
+</div>
+
+<!-- SLIDERS + CONTROLS -->
+<div class="controls">
+  <div class="section-label">Circuit Values</div>
+
+  <div class="slider-row">
+    <div class="slider-head">
+      <span class="slider-name">Voltage (V<sub>S</sub>)</span>
+      <span class="slider-val" id="dV">28 V</span>
+    </div>
+    <input type="range" id="sV" min="1" max="48" value="28" oninput="update()">
+  </div>
+
+  <div class="slider-row">
+    <div class="slider-head">
+      <span class="slider-name">R1</span>
+      <span class="slider-val" id="dR1">100 Ω</span>
+    </div>
+    <input type="range" id="sR1" min="10" max="500" value="100" step="10" oninput="update()">
+  </div>
+
+  <div class="slider-row">
+    <div class="slider-head">
+      <span class="slider-name">R2</span>
+      <span class="slider-val" id="dR2">200 Ω</span>
+    </div>
+    <input type="range" id="sR2" min="10" max="500" value="200" step="10" oninput="update()">
+  </div>
+
+  <div class="slider-row">
+    <div class="slider-head">
+      <span class="slider-name">R3</span>
+      <span class="slider-val" id="dR3">150 Ω</span>
+    </div>
+    <input type="range" id="sR3" min="10" max="500" value="150" step="10" oninput="update()">
+  </div>
+
+  <div class="section-label">Fault Injection</div>
+  <div class="fault-grid">
+    <button class="fault-btn active-ok" id="fNone" onclick="setFault('none')">● Normal</button>
+    <button class="fault-btn" id="fOpen" onclick="setFault('open')">⊘ Open R2</button>
+    <button class="fault-btn" id="fShort" onclick="setFault('short')">⚡ Short R2</button>
+    <button class="fault-btn" id="fHiR" onclick="setFault('hires')">▲ Hi-Res R2</button>
+  </div>
+
+  <div class="section-label">Electron Speed</div>
+  <div class="speed-row">
+    <button class="speed-btn" id="sp0" onclick="setSpeed(0)">⏸</button>
+    <button class="speed-btn" id="sp1" onclick="setSpeed(0.5)">½×</button>
+    <button class="speed-btn active" id="sp2" onclick="setSpeed(1)">1×</button>
+    <button class="speed-btn" id="sp3" onclick="setSpeed(2)">2×</button>
+  </div>
+</div>
+
+<!-- OHM'S LAW CALCULATIONS -->
+<div class="ohm-panel">
+  <div class="section-label">Ohm's Law — Step by Step</div>
+  <div id="calcSteps"></div>
+
+  <div class="section-label" style="margin-top:1rem;">Component Readings</div>
+  <div id="compReadings"></div>
+
+  <div class="fault-box" id="faultBox">
+    <h4>⚠ FAULT ANALYSIS</h4>
+    <p id="faultDesc"></p>
+    <div class="symptom" id="faultSym"></div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───
+let mode = 'series';
+let fault = 'none';
+let spd = 1;
+let T = 0;
+
+const $ = id => document.getElementById(id);
+const v = id => parseFloat($(id).value);
+
+// ─── CANVAS SETUP ───
+const canvas = $('C');
+const ctx = canvas.getContext('2d');
+let W, H, dpr;
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  const wrap = $('canvasWrap');
+  W = wrap.clientWidth;
+  // Aspect ratio: wider on desktop, taller on mobile
+  H = Math.max(280, Math.min(W * 0.55, 420));
+  wrap.style.height = H + 'px';
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', () => { resize(); });
+
+// ─── CIRCUIT MATH ───
+function calc() {
+  let V = v('sV'), R1 = v('sR1'), R2 = v('sR2'), R3 = v('sR3');
+  let R2e = R2;
+  if (fault === 'open') R2e = 1e9;
+  else if (fault === 'short') R2e = 0.001;
+  else if (fault === 'hires') R2e = R2 * 10;
+
+  let Rt, It, comp = [];
+  if (mode === 'series') {
+    Rt = R1 + R2e + R3;
+    It = V / Rt;
+    let V1 = It * R1, V2 = It * R2e, V3 = It * R3;
+    comp = [
+      { n:'R1', R:R1, V:V1, I:It, P:It*V1, f:false },
+      { n:'R2', R:R2e, V:V2, I:It, P:It*V2, f:fault!=='none' },
+      { n:'R3', R:R3, V:V3, I:It, P:It*V3, f:false },
+    ];
+  } else {
+    let inv = 1/R1 + 1/R3;
+    if (fault !== 'open' && isFinite(R2e) && R2e > 0) inv += 1/R2e;
+    Rt = 1/inv;
+    It = V / Rt;
+    let I1 = V/R1, I2 = (fault==='open' ? 0 : V/R2e), I3 = V/R3;
+    comp = [
+      { n:'R1', R:R1, V:V, I:I1, P:V*I1, f:false },
+      { n:'R2', R:R2e, V:(fault==='open'?0:V), I:I2, P:V*I2, f:fault!=='none' },
+      { n:'R3', R:R3, V:V, I:I3, P:V*I3, f:false },
+    ];
+  }
+  return { V, R1, R2, R3, R2e, Rt, It, Pt: V*It, comp };
+}
+
+// ─── FORMAT HELPERS ───
+function fI(a) {
+  if (!isFinite(a) || a > 1e6) return '∞';
+  if (a === 0) return '0';
+  if (a < 0.001) return (a*1e6).toFixed(1) + 'µA';
+  if (a < 1) return (a*1000).toFixed(1) + 'mA';
+  return a.toFixed(2) + 'A';
+}
+function fR(r) {
+  if (!isFinite(r) || r > 1e8) return '∞ Ω';
+  if (r < 1) return r.toFixed(3) + 'Ω';
+  if (r >= 1000) return (r/1000).toFixed(1) + 'kΩ';
+  return r.toFixed(0) + 'Ω';
+}
+
+// ─── UPDATE UI ───
+function update() {
+  $('dV').textContent = v('sV') + ' V';
+  $('dR1').textContent = v('sR1') + ' Ω';
+  $('dR2').textContent = v('sR2') + ' Ω';
+  $('dR3').textContent = v('sR3') + ' Ω';
+
+  let c = calc();
+
+  // Readouts
+  $('rvV').textContent = c.V.toFixed(1);
+  let rt = c.Rt;
+  $('rvR').textContent = rt >= 1000 ? (rt/1000).toFixed(1) : rt.toFixed(0);
+  $('roR').querySelector('.readout-unit').textContent = rt >= 1000 ? 'kΩ' : 'Ω';
+
+  let mA = c.It * 1000;
+  if (mA >= 1000) { $('rvI').textContent = c.It.toFixed(2); $('rvIu').textContent = 'A'; }
+  else { $('rvI').textContent = mA.toFixed(1); $('rvIu').textContent = 'mA'; }
+
+  $('rvP').textContent = c.Pt.toFixed(2);
+
+  // Fault styling
+  ['roV','roR','roI','roP'].forEach(id => { $(id).className = 'readout'; });
+  if (fault !== 'none') {
+    $('roI').classList.add(fault === 'short' ? 'fault' : 'warn');
+    $('roR').classList.add('warn');
+  }
+
+  // Calc steps
+  updateCalc(c);
+  updateComp(c);
+  updateFault(c);
+}
+
+function updateCalc(c) {
+  let h = '';
+  if (mode === 'series') {
+    h += step(1, 'TOTAL RESISTANCE (SUM)', 'R_T = R1 + R2 + R3',
+      `${c.R1} + ${fR(c.R2e)} + ${c.R3} = ${fR(c.Rt)}`);
+    h += step(2, "TOTAL CURRENT (OHM'S LAW)", 'I = V ÷ R_T',
+      `${c.V}V ÷ ${fR(c.Rt)} = ${fI(c.It)}`, true);
+    h += step(3, 'VOLTAGE DROPS (V = I × R)',
+      c.comp.map(x=>`V_${x.n}`).join(' / '),
+      c.comp.map(x=>`V_${x.n} = ${x.V.toFixed(2)}V`).join('  ·  '));
+    h += step(4, 'TOTAL POWER', 'P = V × I',
+      `${c.V}V × ${fI(c.It)} = ${c.Pt.toFixed(2)}W`);
+  } else {
+    let parts = `1/${c.R1} + 1/${c.R3}`;
+    if (fault !== 'open') parts = `1/${c.R1} + 1/${fR(c.R2e)} + 1/${c.R3}`;
+    h += step(1, 'TOTAL RESISTANCE (RECIPROCAL)', `1/R_T = ${parts}`,
+      `R_T = ${fR(c.Rt)}`);
+    h += step(2, "BRANCH CURRENTS (OHM'S LAW)", 'I = V ÷ R each branch',
+      c.comp.map(x=>`I_${x.n} = ${fI(x.I)}`).join('  ·  '), true);
+    h += step(3, 'TOTAL CURRENT (SUM)', 'I_T = I_R1 + I_R2 + I_R3',
+      `I_T = ${fI(c.It)}`);
+    h += step(4, 'TOTAL POWER', 'P = V × I_T',
+      `${c.V}V × ${fI(c.It)} = ${c.Pt.toFixed(2)}W`);
+  }
+  $('calcSteps').innerHTML = h;
+}
+
+function step(n, label, formula, result, hl) {
+  return `<div class="calc-step${hl?' hl':''}">
+    <div class="calc-step-label">STEP ${n} — ${label}</div>
+    <div class="calc-formula">${formula}</div>
+    <div class="calc-result">${result}</div>
+  </div>`;
+}
+
+function updateComp(c) {
+  $('compReadings').innerHTML = c.comp.map(x =>
+    `<div class="comp-row${x.f?' fault-item':''}">
+      <span class="comp-name">${x.n}${x.f?' ⚠':''}</span>
+      <span class="comp-vals">${x.V.toFixed(2)}V · ${fI(x.I)} · ${x.P.toFixed(2)}W</span>
+    </div>`
+  ).join('');
+}
+
+function updateFault(c) {
+  let fb = $('faultBox');
+  if (fault === 'none') { fb.classList.remove('show'); return; }
+  fb.classList.add('show');
+  let d='', s='';
+  if (fault === 'open') {
+    if (mode === 'series') {
+      d = 'OPEN at R2 — series circuit is broken. Zero current flows. Full source voltage appears across the open.';
+      s = 'Aircraft: Total system failure. Entire string of series-connected lights goes dark. Multimeter reads source voltage across break.';
+    } else {
+      d = 'OPEN at R2 — branch dead. R1 and R3 branches still operate. Total current decreases.';
+      s = 'Aircraft: One nav light out, others still working. Total bus current slightly lower than expected.';
+    }
+  } else if (fault === 'short') {
+    if (mode === 'series') {
+      d = 'SHORT at R2 — near-zero resistance. Total R drops, current spikes. Other resistors see higher voltage.';
+      s = 'Aircraft: Circuit breaker pops. Smoke/heat at R2. Remaining components briefly see overvoltage.';
+    } else {
+      d = 'SHORT at R2 — near-zero resistance branch draws massive current. Total R → 0. Immediate breaker trip.';
+      s = 'Aircraft: Instant breaker trip, possible wire bundle overheat. FIRE HAZARD behind panel.';
+    }
+  } else {
+    if (mode === 'series') {
+      d = `HIGH RESISTANCE at R2 (${fR(c.R2e)} vs normal ${c.R2}Ω). Total R up, current down. R2 has excessive voltage drop.`;
+      s = 'Aircraft: Flickering display, warm connector. Classic corrosion signature — intermittent under vibration.';
+    } else {
+      d = `HIGH RESISTANCE at R2 — branch draws less current. Other branches unaffected.`;
+      s = 'Aircraft: One instrument dim or underperforming. Others normal. Check connector pins for corrosion.';
+    }
+  }
+  $('faultDesc').textContent = d;
+  $('faultSym').textContent = s;
+}
+
+// ─── CONTROLS ───
+function setMode(m) {
+  mode = m;
+  $('btnSeries').classList.toggle('active', m==='series');
+  $('btnParallel').classList.toggle('active', m==='parallel');
+  update();
+}
+function setFault(f) {
+  fault = f;
+  document.querySelectorAll('.fault-btn').forEach(b => { b.className = 'fault-btn'; });
+  const map = { none:'fNone', open:'fOpen', short:'fShort', hires:'fHiR' };
+  $(map[f]).classList.add(f==='none' ? 'active-ok' : 'active');
+  update();
+}
+function setSpeed(s) {
+  spd = s;
+  ['sp0','sp1','sp2','sp3'].forEach(id => $(id).classList.remove('active'));
+  const map = {0:'sp0',0.5:'sp1',1:'sp2',2:'sp3'};
+  $(map[s]).classList.add('active');
+}
+
+// ══════════════════════════════════════════
+// ─── CANVAS DRAWING ─────────────────────
+// ══════════════════════════════════════════
+
+function wire(pts, col, w) {
+  if (pts.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.strokeStyle = col || 'rgba(0,255,136,0.3)';
+  ctx.lineWidth = w || 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+
+// ── Standard Battery Symbol ──
+function drawBatt(x, y, voltage) {
+  let h = 36;
+  // Long line (positive)
+  ctx.strokeStyle = '#ff4455';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x-14, y - h/2); ctx.lineTo(x+14, y - h/2); ctx.stroke();
+  // Short line
+  ctx.strokeStyle = '#4488ff';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x-8, y - h/2 + 8); ctx.lineTo(x+8, y - h/2 + 8); ctx.stroke();
+  // Long line
+  ctx.strokeStyle = '#ff4455';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x-14, y - h/2 + 16); ctx.lineTo(x+14, y - h/2 + 16); ctx.stroke();
+  // Short line (negative)
+  ctx.strokeStyle = '#4488ff';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x-8, y - h/2 + 24); ctx.lineTo(x+8, y - h/2 + 24); ctx.stroke();
+  // + / - labels
+  ctx.font = 'bold 11px Orbitron, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ff4455';
+  ctx.fillText('+', x + 22, y - h/2 + 5);
+  ctx.fillStyle = '#4488ff';
+  ctx.fillText('−', x + 22, y - h/2 + 27);
+  // Voltage label
+  ctx.font = 'bold 13px Orbitron, monospace';
+  ctx.fillStyle = '#00ff88';
+  ctx.fillText(voltage + 'V', x, y + h/2 + 4);
+}
+
+// ── Standard Zigzag Resistor Symbol ──
+function drawRes(x, y, label, ohms, vDrop, current, isFault, isOpen) {
+  let w = 54, segs = 6, amp = 9;
+  let x0 = x - w/2, x1 = x + w/2;
+  let segW = w / segs;
+
+  // Zigzag
+  ctx.beginPath();
+  ctx.moveTo(x0, y);
+  for (let i = 0; i < segs; i++) {
+    let peak = (i % 2 === 0) ? -amp : amp;
+    ctx.lineTo(x0 + segW * (i + 0.5), y + peak);
+    ctx.lineTo(x0 + segW * (i + 1), y);
+  }
+  ctx.strokeStyle = isFault ? '#ffaa00' : '#00ff88';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Open X mark
+  if (isOpen) {
+    ctx.strokeStyle = '#ff3344';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x-7, y-7); ctx.lineTo(x+7, y+7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+7, y-7); ctx.lineTo(x-7, y+7); ctx.stroke();
+  }
+
+  // Label above
+  ctx.font = 'bold 12px Orbitron, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = isFault ? '#ffaa00' : '#00ff88';
+  ctx.fillText(label, x, y - 18);
+
+  // Value
+  ctx.font = '10px "Share Tech Mono", monospace';
+  ctx.fillStyle = '#3d5a6e';
+  ctx.fillText(fR(ohms), x, y - 28);
+
+  // Readings below
+  ctx.font = 'bold 11px Orbitron, monospace';
+  ctx.fillStyle = isFault ? '#ffaa00' : '#00cc6a';
+  ctx.fillText(vDrop.toFixed(1) + 'V', x, y + 22);
+  ctx.font = '10px "Share Tech Mono", monospace';
+  ctx.fillStyle = '#3d5a6e';
+  ctx.fillText(fI(current), x, y + 34);
+}
+
+// ── Junction dot ──
+function dot(x, y) {
+  ctx.fillStyle = '#00ff88';
+  ctx.beginPath();
+  ctx.arc(x, y, 3, 0, Math.PI*2);
+  ctx.fill();
+}
+
+// ── Ground Symbol ──
+function gnd(x, y) {
+  ctx.strokeStyle = 'rgba(0,255,136,0.4)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i++) {
+    let lw = 12 - i * 4;
+    ctx.beginPath();
+    ctx.moveTo(x-lw, y + i*5);
+    ctx.lineTo(x+lw, y + i*5);
+    ctx.stroke();
+  }
+}
+
+// ── Current arrow ──
+function arrow(x, y, dir, label) {
+  // dir: 'r','l','u','d'
+  ctx.fillStyle = '#00ff88';
+  ctx.beginPath();
+  if (dir === 'r') {
+    ctx.moveTo(x+6, y); ctx.lineTo(x-3, y-4); ctx.lineTo(x-3, y+4);
+  } else if (dir === 'l') {
+    ctx.moveTo(x-6, y); ctx.lineTo(x+3, y-4); ctx.lineTo(x+3, y+4);
+  } else if (dir === 'd') {
+    ctx.moveTo(x, y+6); ctx.lineTo(x-4, y-3); ctx.lineTo(x+4, y-3);
+  } else {
+    ctx.moveTo(x, y-6); ctx.lineTo(x-4, y+3); ctx.lineTo(x+4, y+3);
+  }
+  ctx.closePath();
+  ctx.fill();
+  if (label) {
+    ctx.font = '9px "Share Tech Mono", monospace';
+    ctx.fillStyle = '#00cc6a';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x, y - 10);
+  }
+}
+
+// ── Electrons along path ──
+function electrons(path, speed, count, phaseOff) {
+  let lens = [], total = 0;
+  for (let i = 1; i < path.length; i++) {
+    let dx = path[i][0]-path[i-1][0], dy = path[i][1]-path[i-1][1];
+    let l = Math.sqrt(dx*dx+dy*dy);
+    lens.push(l);
+    total += l;
+  }
+  if (total < 1) return;
+  let off = phaseOff || 0;
+  for (let e = 0; e < count; e++) {
+    let t = ((T * speed + e * (total/count) + off*40) % total + total) % total;
+    let acc = 0;
+    for (let i = 0; i < lens.length; i++) {
+      if (acc + lens[i] >= t) {
+        let f = (t - acc) / lens[i];
+        let ex = path[i][0] + (path[i+1][0]-path[i][0]) * f;
+        let ey = path[i][1] + (path[i+1][1]-path[i][1]) * f;
+        // Glow
+        let g = ctx.createRadialGradient(ex, ey, 0, ex, ey, 8);
+        g.addColorStop(0, 'rgba(0,238,255,0.8)');
+        g.addColorStop(0.4, 'rgba(0,238,255,0.15)');
+        g.addColorStop(1, 'rgba(0,238,255,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(ex, ey, 8, 0, Math.PI*2); ctx.fill();
+        // Core
+        ctx.fillStyle = '#00eeff';
+        ctx.beginPath(); ctx.arc(ex, ey, 2.5, 0, Math.PI*2); ctx.fill();
+        break;
+      }
+      acc += lens[i];
+    }
+  }
+}
+
+// ══════════════════════════════
+// ─── SERIES CIRCUIT DRAW ─────
+// ══════════════════════════════
+function drawSeries(c, flow) {
+  let mx = W/2, my = H/2;
+  let pad = Math.max(50, W * 0.06);
+  let bx = pad + 15;                    // battery x
+  let topY = my - 40;                   // top wire
+  let botY = my + 55;                   // bottom wire
+  let rightX = W - pad;                 // right edge
+
+  // Resistor positions along top wire
+  let space = (rightX - bx - 40);
+  let r1x = bx + 40 + space * 0.2;
+  let r2x = bx + 40 + space * 0.5;
+  let r3x = bx + 40 + space * 0.8;
+
+  // Wire color
+  let wc = flow ? 'rgba(0,255,136,0.3)' : 'rgba(42,74,58,0.4)';
+
+  // ── WIRES ──
+  // Battery top → along top → through R1 → R2 → R3 → corner → down → bottom → back to battery
+  wire([[bx, my - 18], [bx, topY]], wc);
+  wire([[bx, topY], [r1x - 27, topY]], wc);
+  wire([[r1x + 27, topY], [r2x - 27, topY]], wc);
+  wire([[r2x + 27, topY], [r3x - 27, topY]], wc);
+  wire([[r3x + 27, topY], [rightX, topY]], wc);
+  wire([[rightX, topY], [rightX, botY]], wc);
+  wire([[rightX, botY], [bx, botY]], wc);
+  wire([[bx, botY], [bx, my + 18]], wc);
+
+  // ── BATTERY ──
+  drawBatt(bx, my, c.V);
+
+  // ── RESISTORS (standard zigzag) ──
+  drawRes(r1x, topY, 'R1', c.comp[0].R, c.comp[0].V, c.comp[0].I, false, false);
+  drawRes(r2x, topY, 'R2', c.comp[1].R, c.comp[1].V, c.comp[1].I, c.comp[1].f, fault==='open');
+  drawRes(r3x, topY, 'R3', c.comp[2].R, c.comp[2].V, c.comp[2].I, false, false);
+
+  // ── GROUND ──
+  gnd(rightX, botY + 4);
+
+  // ── CURRENT ARROW ──
+  if (flow) {
+    arrow(bx + 28, topY, 'r', 'I');
+  }
+
+  // ── ELECTRONS ──
+  if (flow && spd > 0) {
+    let ePath = [
+      [bx, my - 18], [bx, topY],
+      [r1x - 27, topY], [r1x + 27, topY],
+      [r2x - 27, topY], [r2x + 27, topY],
+      [r3x - 27, topY], [r3x + 27, topY],
+      [rightX, topY], [rightX, botY],
+      [bx, botY], [bx, my + 18]
+    ];
+    let eSpd = Math.min(c.It * 300, 10);
+    electrons(ePath, eSpd, 20);
+  }
+}
+
+// ══════════════════════════════
+// ─── PARALLEL CIRCUIT DRAW ───
+// ══════════════════════════════
+function drawParallel(c, flow) {
+  let mx = W/2, my = H/2;
+  let pad = Math.max(50, W * 0.06);
+  let bx = pad + 15;
+  let rightX = W - pad;
+
+  let brkSp = Math.min(55, H * 0.14);   // branch spacing
+  let busL = mx - 50;                    // bus left
+  let busR = mx + 50;                    // bus right
+  let topY = my - brkSp - 32;
+  let botY = my + brkSp + 32;
+  let bY = [my - brkSp, my, my + brkSp]; // branch Ys
+
+  let wc = flow ? 'rgba(0,255,136,0.3)' : 'rgba(42,74,58,0.4)';
+
+  // ── MAIN BUS WIRES ──
+  wire([[bx, my - 18], [bx, topY], [busL, topY]], wc);
+  wire([[busR, topY], [rightX, topY], [rightX, botY], [busR, botY]], wc);
+  wire([[busL, botY], [bx, botY], [bx, my + 18]], wc);
+
+  // ── BUS VERTICALS ──
+  wire([[busL, topY], [busL, botY]], wc);
+  wire([[busR, topY], [busR, botY]], wc);
+
+  // ── BRANCH WIRES ──
+  for (let i = 0; i < 3; i++) {
+    wire([[busL, bY[i]], [mx - 27, bY[i]]], wc);
+    wire([[mx + 27, bY[i]], [busR, bY[i]]], wc);
+  }
+
+  // ── BATTERY ──
+  drawBatt(bx, my, c.V);
+
+  // ── JUNCTION DOTS ──
+  dot(busL, topY); dot(busR, topY);
+  dot(busL, botY); dot(busR, botY);
+  for (let i = 0; i < 3; i++) {
+    dot(busL, bY[i]); dot(busR, bY[i]);
+  }
+
+  // ── RESISTORS ──
+  drawRes(mx, bY[0], 'R1', c.comp[0].R, c.comp[0].V, c.comp[0].I, false, false);
+  drawRes(mx, bY[1], 'R2', c.comp[1].R, c.comp[1].V, c.comp[1].I, c.comp[1].f, fault==='open');
+  drawRes(mx, bY[2], 'R3', c.comp[2].R, c.comp[2].V, c.comp[2].I, false, false);
+
+  // ── GROUND ──
+  gnd(rightX, botY + 4);
+
+  // ── CURRENT ARROWS ──
+  if (flow) {
+    arrow(bx + 28, topY, 'r', 'I_total');
+    for (let i = 0; i < 3; i++) {
+      if (i===1 && fault==='open') continue;
+      arrow(busL + 12, bY[i], 'r');
+    }
+  }
+
+  // ── ELECTRONS ──
+  if (flow && spd > 0) {
+    // Feed bus
+    electrons([[bx, my-18], [bx, topY], [busL, topY]], Math.min(c.It*300, 10), 6);
+
+    // Branches
+    for (let i = 0; i < 3; i++) {
+      if (i===1 && fault==='open') continue;
+      let bp = [
+        [busL, topY], [busL, bY[i]],
+        [mx-27, bY[i]], [mx+27, bY[i]],
+        [busR, bY[i]], [busR, botY]
+      ];
+      let bSpd = Math.min(c.comp[i].I * 300, 8);
+      let cnt = Math.max(3, Math.round(c.comp[i].I / c.It * 10));
+      electrons(bp, bSpd, cnt, i * 3.5);
+    }
+
+    // Return bus
+    electrons([[rightX, botY], [busL, botY], [bx, botY], [bx, my+18]], Math.min(c.It*300, 10), 6, 1.5);
+  }
+}
+
+// ─── MAIN LOOP ───
+function frame() {
+  ctx.clearRect(0, 0, W, H);
+  let c = calc();
+  let flow = c.It > 0 && isFinite(c.It) && !(mode==='series' && fault==='open');
+
+  T += 0.016 * spd;
+  if (T > 1e6) T -= 1e6;
+
+  if (mode === 'series') drawSeries(c, flow);
+  else drawParallel(c, flow);
+
+  requestAnimationFrame(frame);
+}
+
+// ─── iOS FIX: Bind sliders properly ───
+['sV','sR1','sR2','sR3'].forEach(id => {
+  const el = $(id);
+  el.addEventListener('input', update);
+  el.addEventListener('change', update);
+  el.addEventListener('touchmove', function(e) {
+    update();
+  }, { passive: true });
+});
+
+// ─── Canvas resize on orientation change ───
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => { resize(); }, 200);
+});
+
+// ─── INIT ───
+resize();
+update();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
